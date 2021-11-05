@@ -22,7 +22,9 @@ import torchvision.transforms as transforms
 from torch.utils.data.sampler import Sampler
 
 from utils.common_tools import call_parse_args
-from models.parse_model_file import model_from_file, model_from_list
+from models.config import model_from_file, model_from_list, model
+from utils.roidb import combined_roidb
+
 def check_set_dataset(args):
     if args.dataset == "pascal_voc":
         args.imdb_name = "voc_2007_trainval"
@@ -45,6 +47,15 @@ def check_set_dataset(args):
         args.imdbval_name = "vg_150-50-50_minival"
         args.set_models = ['ANCHOR_SCALES', '[4, 8, 16, 32]', 'ANCHOR_RATIOS', '[0.5,1,2]', 'MAX_NUM_GT_BOXES', '50']
 
+def load_set_model(args):
+    args.model_file = "./models/{}_ls.yml".format(args.net) if args.large_scale else "./models/{}.yml".format(args.net)
+    if args.model_file is not None:
+      model_from_file(args.model_file)
+    if args.set_models is not None:
+      model_from_list(args.set_models)
+    print('Using config:')
+    pprint.pprint(model)
+    np.random.seed(model.RNG_SEED)
 
 if __name__ == '__main__':
     # step1 config parameters
@@ -55,19 +66,10 @@ if __name__ == '__main__':
     # step2 set path of dataset, set the scale and ratio of anchor, and max number of groundtruth boxes 
     check_set_dataset(args)
 
-    # step3 set model
-    args.model_file = "./models/{}_ls.yml".format(args.net) if args.large_scale else "./models/{}.yml".format(args.net)
-    if args.model_file is not None:
-      model_from_file(args.model_file)
-    if args.set_models is not None:
-      model_from_list(args.set_models)
+    # step3 load model file and set model 
+    load_set_model(args)
 
-    # print('Using config:')
-    # pprint.pprint(model)
-    # np.random.seed(model.RNG_SEED)
-
-"""
-    #torch.backends.cudnn.benchmark = True
+    # step4 torch.backends.cudnn.benchmark = True
     if torch.cuda.is_available() and not args.cuda:
       print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
@@ -91,7 +93,7 @@ if __name__ == '__main__':
 
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size,
                               sampler=sampler_batch, num_workers=args.num_workers)
-
+"""
     # initilize the tensor holder here.
     im_data = torch.FloatTensor(1)
     im_info = torch.FloatTensor(1)

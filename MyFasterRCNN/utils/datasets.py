@@ -1,4 +1,5 @@
 from torch.utils.data.sampler import Sampler
+
 class sampler(Sampler):
     def __init__(self, train_size, batch_size):
         self.num_data = train_size
