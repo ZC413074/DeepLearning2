@@ -16,7 +16,7 @@ def call_parse_args():
     parser.add_argument('--cuda', dest='cuda', help='whether use CUDA', action='store_true')
     parser.add_argument('--ls', dest='large_scale', help='whether use large imag scale', action='store_true')                      
     parser.add_argument('--mGPUs', dest='mGPUs', help='whether use multiple GPUs', action='store_true')
-    parser.add_argument('--bs', dest='batch_size', help='batch_size', default=1, type=int)
+    parser.add_argument('--bs', dest='batch_size', help='batch_size', default=32, type=int)
     parser.add_argument('--cag', dest='class_agnostic', help='whether to perform class_agnostic bbox regression', action='store_true')
     # config optimization
     parser.add_argument('--o', dest='optimizer', help='training optimizer', default="sgd", type=str)

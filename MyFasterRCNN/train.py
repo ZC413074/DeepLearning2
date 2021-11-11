@@ -24,6 +24,7 @@ from torch.utils.data.sampler import Sampler
 from utils.common_tools import call_parse_args
 from models.config import model_from_file, model_from_list, model
 from utils.roidb import combined_roidb
+from utils.datasets import sampler, roibatchLoader
 
 def check_set_dataset(args):
     if args.dataset == "pascal_voc":
@@ -57,29 +58,12 @@ def load_set_model(args):
     pprint.pprint(model)
     np.random.seed(model.RNG_SEED)
 
-if __name__ == '__main__':
-    # step1 config parameters
-    args = call_parse_args()
-    print('Called with args:')
-    print(args)
-
-    # step2 set path of dataset, set the scale and ratio of anchor, and max number of groundtruth boxes 
-    check_set_dataset(args)
-
-    # step3 load model file and set model 
-    load_set_model(args)
-
-    # step4 torch.backends.cudnn.benchmark = True
-    if torch.cuda.is_available() and not args.cuda:
-      print("WARNING: You have a CUDA device, so you should probably run with --cuda")
-
-    # train set
+def load_set_dataset(args):
     # -- Note: Use validation set and disable the flipped to enable faster loading.
     model.TRAIN.USE_FLIPPED = True
     model.USE_GPU_NMS = args.cuda
     imdb, roidb, ratio_list, ratio_index = combined_roidb(args.imdb_name)
     train_size = len(roidb)
-
     print('{:d} roidb entries'.format(len(roidb)))
 
     output_dir = args.save_dir + "/" + args.net + "/" + args.dataset
@@ -93,30 +77,31 @@ if __name__ == '__main__':
 
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size,
                               sampler=sampler_batch, num_workers=args.num_workers)
-"""
-    # initilize the tensor holder here.
+    return imdb, dataloader
+
+def init_train(args, imdb):
+    # step1  initial data
+     # step1.1 initilize the tensor holder here.
     im_data = torch.FloatTensor(1)
     im_info = torch.FloatTensor(1)
     num_boxes = torch.LongTensor(1)
     gt_boxes = torch.FloatTensor(1)
-
-    # ship to cuda
+     # step1.2 ship to cuda
     if args.cuda:
       im_data = im_data.cuda()
       im_info = im_info.cuda()
       num_boxes = num_boxes.cuda()
       gt_boxes = gt_boxes.cuda()
-
-    # make variable
+     # step1.3 make variable
     im_data = Variable(im_data)
     im_info = Variable(im_info)
     num_boxes = Variable(num_boxes)
     gt_boxes = Variable(gt_boxes)
 
+    # step2 initial model
     if args.cuda:
       model.CUDA = True
-
-    # initilize the network here.
+     # step2.1 initilize the network here.
     if args.net == 'vgg16':
       fasterRCNN = vgg16(imdb.classes, pretrained=True, class_agnostic=args.class_agnostic)
     elif args.net == 'res101':
@@ -128,14 +113,14 @@ if __name__ == '__main__':
     else:
       print("network is not defined")
       pdb.set_trace()
-
     fasterRCNN.create_architecture()
-
+    if args.cuda:
+      fasterRCNN.cuda()
+     # step2.2 initilize parameters.  
     lr = model.TRAIN.LEARNING_RATE
     lr = args.lr
-    #tr_momentum = model.TRAIN.MOMENTUM
-    #tr_momentum = args.momentum
-
+     # tr_momentum = model.TRAIN.MOMENTUM
+     #tr_momentum = args.momentum
     params = []
     for key, value in dict(fasterRCNN.named_parameters()).items():
       if value.requires_grad:
@@ -145,6 +130,7 @@ if __name__ == '__main__':
         else:
           params += [{'params':[value],'lr':lr, 'weight_decay': model.TRAIN.WEIGHT_DECAY}]
 
+    # step3 initial optimizer
     if args.optimizer == "adam":
       lr = lr * 0.1
       optimizer = torch.optim.Adam(params)
@@ -152,8 +138,22 @@ if __name__ == '__main__':
     elif args.optimizer == "sgd":
       optimizer = torch.optim.SGD(params, momentum=model.TRAIN.MOMENTUM)
 
-    if args.cuda:
-      fasterRCNN.cuda()
+    return  
+
+def train(args):
+
+    # step1 load datas
+    imdb, dataloader = load_set_dataset(args)
+
+    # step2 initial train   value and model
+    init_train(args, imdb)
+
+
+
+
+
+
+
 
     if args.resume:
       load_name = os.path.join(output_dir,
@@ -178,6 +178,7 @@ if __name__ == '__main__':
       from tensorboardX import SummaryWriter
       logger = SummaryWriter("logs")
 
+"""
     for epoch in range(args.start_epoch, args.max_epochs + 1):
       # setting to train mode
       fasterRCNN.train()
@@ -266,3 +267,25 @@ if __name__ == '__main__':
     if args.use_tfboard:
       logger.close()
 """
+
+
+if __name__ == '__main__':
+    # step1 config parameters
+    args = call_parse_args()
+    print('Called with args:')
+    print(args)
+
+    # step2 set path of dataset, set the scale and ratio of anchor, and max number of groundtruth boxes 
+    check_set_dataset(args)
+
+    # step3 load model file and set model 
+    load_set_model(args)
+
+    # step4 torch.backends.cudnn.benchmark = True
+    if torch.cuda.is_available() and not args.cuda:
+      print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+
+    # step5 train
+    train(args)
+
+
